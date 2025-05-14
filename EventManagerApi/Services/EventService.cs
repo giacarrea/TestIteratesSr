@@ -77,7 +77,7 @@ namespace EventManagerApi.Services
             return ev?.Registrations ?? Enumerable.Empty<Registration>();
         }
 
-        public async Task<Registration> RegisterForEventAsync(Guid eventId, string userId) //TODO use jwt identity insdtead of userid
+        public async Task<Registration> RegisterForEventAsync(Guid eventId, string userId) 
         {
             var ev = await _context.GetByIdAsync(eventId);
             if (ev == null)
@@ -109,7 +109,7 @@ namespace EventManagerApi.Services
             return registration;
         }
 
-        public async Task<bool> UnregisterFromEventAsync(Guid eventId, string userId) //TODO use jwt identity insdtead of userid
+        public async Task<bool> UnregisterFromEventAsync(Guid eventId, string userId)
         {
             var ev = await _context.GetByIdAsync(eventId);
             if (ev == null)

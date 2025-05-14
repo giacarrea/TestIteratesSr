@@ -1,12 +1,13 @@
 ﻿using EventManagerApi.Interface;
 using EventManagerApi.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace EventManagerApi.Controllers
 {
-    //TODO restrict jwt roles
 
     [Route("api/[controller]")]
     [ApiController]
@@ -20,22 +21,8 @@ namespace EventManagerApi.Controllers
         }
 
         // GET: api/Event
-        //[HttpGet]
-        //public async Task<ActionResult<IEnumerable<Event>>> Get()
-        //{
-        //    try
-        //    {
-        //        var events = await _eventService.GetAllEventsAsync();
-        //        return Ok(events);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new { error = ex.Message });
-        //    }
-        //}
-
-        // GET: api/Event
         [HttpGet]
+        [Authorize] // Any authenticated user can view events
         public async Task<ActionResult<IEnumerable<Event>>> Get(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null,
@@ -55,6 +42,7 @@ namespace EventManagerApi.Controllers
 
         // POST: api/Event
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<Event>> Post([FromBody] Event newEvent)
         {
             try
@@ -70,6 +58,7 @@ namespace EventManagerApi.Controllers
 
         // PUT: api/Event/{id}
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Put(Guid id, [FromBody] Event updatedEvent)
         {
             try
@@ -87,6 +76,7 @@ namespace EventManagerApi.Controllers
 
         // DELETE: api/Event/{id}
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             try
@@ -104,6 +94,7 @@ namespace EventManagerApi.Controllers
 
         // GET: api/Event/{id}/registrations
         [HttpGet("{id}/registrations")]
+        [Authorize] // Any authenticated user can view registrations
         public async Task<ActionResult<IEnumerable<Registration>>> GetRegistrations(Guid id)
         {
             try
@@ -119,10 +110,15 @@ namespace EventManagerApi.Controllers
 
         // POST: api/Event/{id}/registrations
         [HttpPost("{id}/registrations")]
-        public async Task<ActionResult<Registration>> Register(Guid id, [FromBody] string userId)
+        [Authorize] // Any authenticated user can register
+        public async Task<ActionResult<Registration>> Register(Guid id)
         {
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return BadRequest(new { error = "User ID not found in token." });
+
                 var registration = await _eventService.RegisterForEventAsync(id, userId);
                 return CreatedAtAction(nameof(GetRegistrations), new { id }, registration);
             }
@@ -138,10 +134,15 @@ namespace EventManagerApi.Controllers
 
         // DELETE: api/Event/{id}/registrations/{userId}
         [HttpDelete("{id}/registrations/{userId}")]
-        public async Task<IActionResult> Unregister(Guid id, string userId)
+        [Authorize] // Any authenticated user can unregister
+        public async Task<IActionResult> Unregister(Guid id)
         {
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return BadRequest(new { error = "User ID not found in token." });
+
                 var result = await _eventService.UnregisterFromEventAsync(id, userId);
                 if (!result)
                     return NotFound();
