@@ -1,11 +1,12 @@
-﻿using EventManagerApi.Models;
+﻿using EventManagerApi.Interface;
+using EventManagerApi.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace EventManagerApi.Data
 {
-    public class EventDbContext : IdentityDbContext
+    public class EventDbContext : IdentityDbContext, IEventDbContext
     {
         public DbSet<Event> Events { get; set; }
         public DbSet<Registration> Registrations { get; set; }

@@ -6,10 +6,10 @@ namespace EventManagerApi.Services
 {
     public class EventService : IEventService
     {
-        private readonly EventDbContext _context;
+        private readonly IEventDbContext _context;
         private readonly ILogger<EventService> _logger; // Add logger
 
-        public EventService(EventDbContext context, ILogger<EventService> logger)
+        public EventService(IEventDbContext context, ILogger<EventService> logger)
         {
             _context = context;
             _logger = logger;

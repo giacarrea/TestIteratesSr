@@ -10,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+// Register EventDbContext as the implementation for IEventDbContext
 builder.Services.AddDbContext<EventDbContext>();
+builder.Services.AddScoped<IEventDbContext>(provider => provider.GetRequiredService<EventDbContext>());
 
 // Add Identity
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
