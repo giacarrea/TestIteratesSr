@@ -39,6 +39,9 @@ namespace EventManagerApi.Services
         }
 
         
+static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt)> _eventsCache = new();
+        private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
+
         public async Task<IEnumerable<Event>> GetAllEventsAsync(
             DateTime? startDate = null,
             DateTime? endDate = null,
@@ -47,12 +50,32 @@ namespace EventManagerApi.Services
         {
             _logger.LogDebug("Retrieving events with filters: startDate={StartDate}, endDate={EndDate}, category={Category}, status={Status}", startDate, endDate, category, status);
 
-            return await _context.GetFilteredAsync(e =>
+            // Create a cache key based on filter parameters
+            var cacheKey = $"{startDate?.ToString("o") ?? "null"}_{endDate?.ToString("o") ?? "null"}_{category ?? "null"}_{status?.ToString() ?? "null"}";
+
+            // Try to get from cache
+            if (_eventsCache.TryGetValue(cacheKey, out var cacheEntry))
+            {
+                if (DateTime.UtcNow - cacheEntry.CachedAt < _cacheDuration)
+                {
+                    _logger.LogDebug("Returning events from cache for key {CacheKey}", cacheKey);
+                    return cacheEntry.Events;
+                }
+                else
+                {
+                    _eventsCache.Remove(cacheKey);
+                }
+            }
+
+            var events = await _context.GetFilteredAsync(e =>
                 (startDate == null || e.Date >= startDate) &&
                 (endDate == null || e.Date <= endDate) &&
                 (category == null || e.Category == category) &&
                 (status == null || e.Status == status)
             );
+
+            _eventsCache[cacheKey] = (events, DateTime.UtcNow);
+            return events;
         }
 
 
