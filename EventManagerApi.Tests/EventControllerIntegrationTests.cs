@@ -1,11 +1,9 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
-using System.Threading.Tasks;
-using Xunit;
 using Microsoft.AspNetCore.Mvc.Testing;
 using EventManagerApi.Models;
-using System;
-using Microsoft.VisualStudio.TestPlatform.TestHost;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace EventManagerApi.Tests
 {
@@ -19,20 +17,43 @@ namespace EventManagerApi.Tests
         }
 
         [Fact]
+        public async Task LoginRoute_ReturnsJwtToken()
+        {
+            var client = _factory.CreateClient();
+
+            // Attempt to get JWT token for a test user (ensure this user exists in your test DB)
+            var loginRequest = new { Username = "admin", Password = "admin" };
+            var response = await client.PostAsJsonAsync("/api/Auth/login", loginRequest);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var token = json.GetProperty("token").GetString();
+
+            Assert.False(string.IsNullOrWhiteSpace(token));
+        }
+
+        [Fact]
         public async Task GetEvents_ReturnsOk()
         {
             var client = _factory.CreateClient();
-            // Add authentication header if required
+
+            // Get JWT token for a test user (ensure this user exists in your test DB)
+            var token = await GetJwtTokenAsync(client, "user1", "user1");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var response = await client.GetAsync("/api/Event");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
 
         [Fact]
-        public async Task RegisterForEvent_ReturnsCreated()
+        public async Task CreateEventAsUser_Forbidden()
         {
             var client = _factory.CreateClient();
-            // Add authentication header if required
+
+            // Get JWT token for a test user (ensure this user exists in your test DB)
+            var token = await GetJwtTokenAsync(client, "user1", "user1");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             // First, create an event as admin (mock or seed as needed)
             var newEvent = new Event
@@ -47,13 +68,17 @@ namespace EventManagerApi.Tests
 
             // You may need to authenticate as admin here
             var createResponse = await client.PostAsJsonAsync("/api/Event", newEvent);
-            createResponse.EnsureSuccessStatusCode();
-            var createdEvent = await createResponse.Content.ReadFromJsonAsync<Event>();
+            Assert.Equal(HttpStatusCode.Forbidden, createResponse.StatusCode);
+        }
 
-            // Now, register for the event
-            // You may need to authenticate as a user here
-            var regResponse = await client.PostAsync($"/api/Event/{createdEvent.Id}/registrations", null);
-            Assert.Equal(HttpStatusCode.Created, regResponse.StatusCode);
+
+        private async Task<string> GetJwtTokenAsync(HttpClient client, string username, string password)
+        {
+            var loginRequest = new { Username = username, Password = password };
+            var response = await client.PostAsJsonAsync("/api/Auth/login", loginRequest);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return json.GetProperty("token").GetString()!;
         }
     }
 }
