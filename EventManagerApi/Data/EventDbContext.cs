@@ -26,16 +26,31 @@ namespace EventManagerApi.Data
         {
             return await Events.Include(e => e.Registrations).Where(filter).ToListAsync();
         }
+
         public async Task AddAsync(Event ev)
         {
             await Events.AddAsync(ev);
             await SaveChangesAsync();
         }
+
         public async Task UpdateAsync(Event ev)
         {
             Events.Update(ev);
             await SaveChangesAsync();
         }
+
+        public async Task AddRegistrationAsync(Event ev, Registration reg) 
+        {
+            await Registrations.AddAsync(reg);
+
+            if (!ev.Registrations.Contains(reg))
+                ev.Registrations.Add(reg);
+
+            Events.Update(ev);
+
+            await SaveChangesAsync();
+        }
+
         public async Task DeleteAsync(Event ev)
         {
             Events.Remove(ev);

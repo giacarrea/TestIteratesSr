@@ -103,8 +103,8 @@ namespace EventManagerApi.Services
                 UserId = userId,
                 RegisteredAt = DateTime.UtcNow
             };
-            ev.Registrations.Add(registration);
-            await _context.UpdateAsync(ev);
+            //ev.Registrations.Add(registration);
+            await _context.AddRegistrationAsync(ev, registration);
             _logger.LogInformation("User {UserId} registered for event {EventId}", userId, eventId);
             return registration;
         }

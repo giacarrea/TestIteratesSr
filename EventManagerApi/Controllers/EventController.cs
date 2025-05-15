@@ -115,7 +115,7 @@ namespace EventManagerApi.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = User?.Identity?.Name;
                 if (string.IsNullOrEmpty(userId))
                     return BadRequest(new { error = "User ID not found in token." });
 
@@ -132,14 +132,14 @@ namespace EventManagerApi.Controllers
             }
         }
 
-        // DELETE: api/Event/{id}/registrations/{userId}
-        [HttpDelete("{id}/registrations/{userId}")]
+        // DELETE: api/Event/{id}/registrations
+        [HttpDelete("{id}/registrations")]
         [Authorize] // Any authenticated user can unregister
         public async Task<IActionResult> Unregister(Guid id)
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = User?.Identity?.Name;
                 if (string.IsNullOrEmpty(userId))
                     return BadRequest(new { error = "User ID not found in token." });
 
