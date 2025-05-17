@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using System.Text.Json.Serialization
 @using EventBlazorApp.Models
+@using System.Text.Json
 
 @rendermode InteractiveServer
 
@@ -9,7 +10,13 @@
 
 <h3>Event Registration</h3>
 
-@if (!_loaded)
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">
+        <strong>Error:</strong> @(_error)
+    </div>
+}
+else if(!_loaded)
 {
     <p>Loading...</p>
 }
@@ -35,6 +42,7 @@ else if (!AuthSession.IsAuthenticated)
 }
 else
 {
+    <h4>Welcome, @AuthSession.Username!</h4>
     <button class="btn btn-secondary mb-2" @onclick="Logout">Logout</button>
     <h4>Events</h4>
     @if (events == null)
@@ -48,7 +56,7 @@ else
             {
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <span>
-                        <b>@ev.Title</b> - @ev.Date.ToShortDateString()
+                        <b>@ev.Title</b> - @ev.Date.ToShortDateString() <span>Remaining seats: @ev.RegistrationList.Registrations.Count / @ev.Capacity </span>
                     </span>
                     @if (ev.IsRegistered)
                     {
@@ -66,22 +74,6 @@ else
 
 @code {
     const string ApiBaseUrl = "https://localhost:7296";
-    // Models
-    class LoginModel
-    {
-        [JsonPropertyName("username")]
-        public string Username { get; set; } = "";
-
-        [JsonPropertyName("password")]
-        public string Password { get; set; } = "";
-    }
-    class EventDto
-    {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = "";
-        public DateTime Date { get; set; }
-        public bool IsRegistered { get; set; }
-    }
 
     // State
 
@@ -91,6 +83,7 @@ else
     List<EventDto>? events;
 
     private bool _loaded = false;
+    private string? _error = null;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -152,17 +145,32 @@ else
     {
         try
         {
-            var eventList = await Http.GetFromJsonAsync<List<EventDto>>($"{ApiBaseUrl}/api/event");
-            // For demo: Assume API returns all events, and you need to check registration status per event
+            var rawResponse = await Http.GetAsync($"{ApiBaseUrl}/api/event");
+            var rawContent = await rawResponse.Content.ReadAsStringAsync();
+
+            var eventListDto = JsonSerializer.Deserialize<EventListDto>(rawContent);
+            var eventList = eventListDto?.Events;
+            //var eventList = await Http.GetFromJsonAsync<List<EventDto>>($"{ApiBaseUrl}/api/event");
+
+            // For demo: Assume API returns all events, and you need to check registration status per event            
             foreach (var ev in eventList ?? Enumerable.Empty<EventDto>())
             {
-                var regs = await Http.GetFromJsonAsync<List<RegistrationDto>>($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
-                ev.IsRegistered = regs?.Any(r => r.UserId == loginModel.Username) ?? false;
+                //var regs = await Http.GetFromJsonAsync<List<RegistrationDto>>($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
+
+                var rawRegResponse = await Http.GetAsync($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
+                var rawRegContent = await rawRegResponse.Content.ReadAsStringAsync();
+                var regListDto = JsonSerializer.Deserialize<RegistrationList>(rawRegContent);
+                var regs = regListDto?.Registrations;   
+
+                ev.IsRegistered = regs?.Any(r => r.UserId == AuthSession.Username) ?? false;
             }
             events = eventList;
+
+            _error = null;
         }
-        catch
+        catch(Exception ex)
         {
+            _error = $"Failed to load events: {ex.Message}";
             events = new List<EventDto>();
         }
         StateHasChanged();
@@ -170,19 +178,43 @@ else
 
     async Task Register(Guid eventId)
     {
-        var resp = await Http.PostAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations", null);
-        if (resp.IsSuccessStatusCode)
+        try
         {
-            await LoadEvents();
+            var resp = await Http.PostAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                await LoadEvents();
+            }
+            else
+            {
+                var errorMessage = await resp.Content.ReadAsStringAsync();
+                _error = $"Failed to register: {errorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"An error occurred during registration: {ex.Message}";
         }
     }
 
     async Task Unregister(Guid eventId)
     {
-        var resp = await Http.DeleteAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations");
-        if (resp.IsSuccessStatusCode)
+        try
         {
-            await LoadEvents();
+            var resp = await Http.DeleteAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations");
+            if (resp.IsSuccessStatusCode)
+            {
+                await LoadEvents();
+            }
+            else
+            {
+                var errorMessage = await resp.Content.ReadAsStringAsync();
+                _error = $"Failed to unregister: {errorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"An error occurred during unregistration: {ex.Message}";
         }
     }
 
