@@ -2,12 +2,18 @@
 @using System.Text.Json.Serialization
 @using EventBlazorApp.Models
 
+@rendermode InteractiveServer
+
 @inject HttpClient Http
 @inject AuthSessionService AuthSession
 
 <h3>Event Registration</h3>
 
-@if (!AuthSession.IsAuthenticated)
+@if (!_loaded)
+{
+    <p>Loading...</p>
+}
+else if (!AuthSession.IsAuthenticated)
 {
     <EditForm Model="loginModel" OnValidSubmit="LoginAsync" FormName="LoginForm">
         <DataAnnotationsValidator />
@@ -84,11 +90,25 @@ else
     string? loginError;
     List<EventDto>? events;
 
+    private bool _loaded = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            loginModel ??= new();
+            await AuthSession.LoadAsync(); // JS interop is now safe
+            await TryLoadEvents();
+            _loaded = true;
+            StateHasChanged(); // Ensure UI updates after loading
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         loginModel ??= new();
-        AuthSession.LoadAsync();
-        await TryLoadEvents();
+        //AuthSession.LoadAsync();
+        //await TryLoadEvents();
     }
 
     async Task LoginAsync()
@@ -110,10 +130,11 @@ else
         }
     }
 
-    void Logout()
+    async Task Logout()
     {
         AuthSession.JwtToken = null;
         AuthSession.Username = null;
+        await AuthSession.ClearAsync();
         Http.DefaultRequestHeaders.Authorization = null;
         events = null;
     }
