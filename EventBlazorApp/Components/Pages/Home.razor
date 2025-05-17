@@ -16,6 +16,7 @@
     <div class="alert alert-danger">
         <strong>Error:</strong> @(_error)
     </div>
+    <button class="btn btn-outline-secondary mb-2" @onclick="RefreshPage">Ok</button>
 }
 else if(!_loaded)
 {
@@ -398,5 +399,11 @@ else
         {
             _error = $"An error occurred while saving the event: {ex.Message}";
         }
+    }
+
+    async Task RefreshPage()
+    {
+        _error = null;
+        await LoadEvents();
     }
 }
