@@ -1,8 +1,8 @@
 # Projects descriptions 
 
-EventBlazorApp: Blazor app consuming EventManagerApi.
-EventManagerApi: Web API for managing events and registrations, featuring JWT authentication and role-based authorization.
-EventManagerApi.Tests: Test project for EventManagerApi
+- EventBlazorApp: Blazor app consuming EventManagerApi.
+- EventManagerApi: Web API for managing events and registrations, featuring JWT authentication and role-based authorization.
+- EventManagerApi.Tests: Test project for EventManagerApi
 
 ## Setup Instructions
 
