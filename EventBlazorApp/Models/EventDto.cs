@@ -1,5 +1,4 @@
-﻿using EventBlazorApp.Misc;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace EventBlazorApp.Models
 {
@@ -41,9 +40,6 @@ namespace EventBlazorApp.Models
         [JsonPropertyName("status")]
         public int Status { get; set; }
 
-        //[JsonPropertyName("registrations")]
-        //public RegistrationList RegistrationList { get; set; } = new();
-
         [JsonIgnore]
         public RegistrationList RegistrationList { get; set; } = new();
 
@@ -82,24 +78,6 @@ namespace EventBlazorApp.Models
 
         [JsonPropertyName("event")]
         public EventRefDto? Event { get; set; }
-
-        //[JsonPropertyName("event")]
-        //[JsonConverter(typeof(IgnoreAnythingConverter))]
-        //public EventRefDto? Event { get; set; }
-
-        //[JsonPropertyName("event")]
-        //public string? Event { get; set; }
-
-
-        //[JsonIgnore]
-        //public EventRefDto? Event { get; set; }
-
-        //[JsonPropertyName("event")]
-        //public string EventString
-        //{
-        //    get => "string"; // or set to null/empty if you want
-        //    set { /* ignore on set */ }
-        //}
 
         [JsonPropertyName("userId")]
         public string UserId { get; set; } = "";

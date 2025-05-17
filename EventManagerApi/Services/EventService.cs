@@ -7,7 +7,16 @@ namespace EventManagerApi.Services
     public class EventService : IEventService
     {
         private readonly IEventDbContext _context;
-        private readonly ILogger<EventService> _logger; // Add logger
+        private readonly ILogger<EventService> _logger;
+
+        static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt)> _eventsCache = new();
+        private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
+
+        private void ResetEventsCache()
+        {
+            _eventsCache.Clear();
+            _logger.LogDebug("Events cache cleared due to data change.");
+        }
 
         public EventService(IEventDbContext context, ILogger<EventService> logger)
         {
@@ -21,6 +30,7 @@ namespace EventManagerApi.Services
             newEvent.Status = EventStatus.Draft;
             newEvent.Registrations = new List<Registration>();
             await _context.AddAsync(newEvent);
+            ResetEventsCache();
             _logger.LogInformation("Created new event with ID {EventId} and title '{Title}'", newEvent.Id, newEvent.Title);
             return newEvent;
         }
@@ -34,26 +44,21 @@ namespace EventManagerApi.Services
                 return false;
             }
             await _context.DeleteAsync(ev);
+            ResetEventsCache();
             _logger.LogInformation("Deleted event with ID {EventId}", id);
             return true;
         }
-
-        
-static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt)> _eventsCache = new();
-        private static readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
 
         public async Task<IEnumerable<Event>> GetAllEventsAsync(
             DateTime? startDate = null,
             DateTime? endDate = null,
             string? category = null,
-            EventStatus? status = null) //TODO pagination
+            EventStatus? status = null)
         {
             _logger.LogDebug("Retrieving events with filters: startDate={StartDate}, endDate={EndDate}, category={Category}, status={Status}", startDate, endDate, category, status);
 
-            // Create a cache key based on filter parameters
             var cacheKey = $"{startDate?.ToString("o") ?? "null"}_{endDate?.ToString("o") ?? "null"}_{category ?? "null"}_{status?.ToString() ?? "null"}";
 
-            // Try to get from cache
             if (_eventsCache.TryGetValue(cacheKey, out var cacheEntry))
             {
                 if (DateTime.UtcNow - cacheEntry.CachedAt < _cacheDuration)
@@ -78,8 +83,6 @@ static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt
             return events;
         }
 
-
-
         public async Task<Event?> GetEventByIdAsync(Guid id)
         {
             var ev = await _context.GetByIdAsync(id);
@@ -100,7 +103,7 @@ static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt
             return ev?.Registrations ?? Enumerable.Empty<Registration>();
         }
 
-        public async Task<Registration> RegisterForEventAsync(Guid eventId, string userId) 
+        public async Task<Registration> RegisterForEventAsync(Guid eventId, string userId)
         {
             var ev = await _context.GetByIdAsync(eventId);
             if (ev == null)
@@ -126,8 +129,8 @@ static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt
                 UserId = userId,
                 RegisteredAt = DateTime.UtcNow
             };
-            //ev.Registrations.Add(registration);
             await _context.AddRegistrationAsync(ev, registration);
+            ResetEventsCache();
             _logger.LogInformation("User {UserId} registered for event {EventId}", userId, eventId);
             return registration;
         }
@@ -148,6 +151,7 @@ static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt
             }
             ev.Registrations.Remove(reg);
             await _context.UpdateAsync(ev);
+            ResetEventsCache();
             _logger.LogInformation("User {UserId} unregistered from event {EventId}", userId, eventId);
             return true;
         }
@@ -175,9 +179,9 @@ static readonly Dictionary<string, (IEnumerable<Event> Events, DateTime CachedAt
             ev.Capacity = updatedEvent.Capacity;
             ev.Status = updatedEvent.Status;
             await _context.UpdateAsync(ev);
+            ResetEventsCache();
             _logger.LogInformation("Updated event with ID {EventId}", id);
             return true;
         }
-
     }
 }

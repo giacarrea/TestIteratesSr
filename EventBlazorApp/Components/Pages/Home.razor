@@ -323,7 +323,7 @@ else
                 Id = Guid.Empty,
                 Title = "",
                 Description = "",
-                Date = DateTime.Today,
+                Date = DateTime.Today.AddDays(1),
                 Location = "",
                 Category = "",
                 Capacity = 1,
@@ -364,10 +364,6 @@ else
             return;
 
         var serializedJson = JsonSerializer.Serialize(editingEvent);
-
-        //Super messy, but whatever...
-        //foreach (var reg in editingEvent.RegistrationList.Registrations)
-        //    reg.Event = new() { Ref=reg.IdRef };        
 
         try
         {
