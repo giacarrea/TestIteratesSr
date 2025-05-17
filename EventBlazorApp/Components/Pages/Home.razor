@@ -1,0 +1,177 @@
+﻿@page "/"
+@using System.Text.Json.Serialization
+@using EventBlazorApp.Models
+
+@inject HttpClient Http
+@inject AuthSessionService AuthSession
+
+<h3>Event Registration</h3>
+
+@if (!AuthSession.IsAuthenticated)
+{
+    <EditForm Model="loginModel" OnValidSubmit="LoginAsync" FormName="LoginForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div>
+            <label>Username:</label>
+            <InputText @bind-Value="loginModel.Username" />
+        </div>
+        <div>
+            <label>Password:</label>
+            <InputText @bind-Value="loginModel.Password" type="password" />
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+        @if (!string.IsNullOrEmpty(loginError))
+        {
+            <div class="text-danger">@loginError</div>
+        }
+    </EditForm>
+}
+else
+{
+    <button class="btn btn-secondary mb-2" @onclick="Logout">Logout</button>
+    <h4>Events</h4>
+    @if (events == null)
+    {
+        <p>Loading events...</p>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var ev in events)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>
+                        <b>@ev.Title</b> - @ev.Date.ToShortDateString()
+                    </span>
+                    @if (ev.IsRegistered)
+                    {
+                        <button class="btn btn-danger btn-sm" @onclick="() => Unregister(ev.Id)">Unregister</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-success btn-sm" @onclick="() => Register(ev.Id)">Register</button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    const string ApiBaseUrl = "https://localhost:7296";
+    // Models
+    class LoginModel
+    {
+        [JsonPropertyName("username")]
+        public string Username { get; set; } = "";
+
+        [JsonPropertyName("password")]
+        public string Password { get; set; } = "";
+    }
+    class EventDto
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = "";
+        public DateTime Date { get; set; }
+        public bool IsRegistered { get; set; }
+    }
+
+    // State
+
+    [SupplyParameterFromForm]
+    LoginModel loginModel { get; set; }
+    string? loginError;
+    List<EventDto>? events;
+
+    protected override async Task OnInitializedAsync()
+    {
+        loginModel ??= new();
+        AuthSession.LoadAsync();
+        await TryLoadEvents();
+    }
+
+    async Task LoginAsync()
+    {
+        loginError = null;
+        var response = await Http.PostAsJsonAsync($"{ApiBaseUrl}/api/auth/login", loginModel);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<LoginResult>();
+            AuthSession.JwtToken = result?.token;
+            AuthSession.Username = loginModel.Username;
+            await AuthSession.SaveAsync();
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthSession.JwtToken);
+            await LoadEvents();
+        }
+        else
+        {
+            loginError = "Invalid username or password.";
+        }
+    }
+
+    void Logout()
+    {
+        AuthSession.JwtToken = null;
+        AuthSession.Username = null;
+        Http.DefaultRequestHeaders.Authorization = null;
+        events = null;
+    }
+
+    async Task TryLoadEvents()
+    {
+        if (AuthSession.IsAuthenticated)
+        {
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthSession.JwtToken);
+            await LoadEvents();
+        }
+    }
+
+    async Task LoadEvents()
+    {
+        try
+        {
+            var eventList = await Http.GetFromJsonAsync<List<EventDto>>($"{ApiBaseUrl}/api/event");
+            // For demo: Assume API returns all events, and you need to check registration status per event
+            foreach (var ev in eventList ?? Enumerable.Empty<EventDto>())
+            {
+                var regs = await Http.GetFromJsonAsync<List<RegistrationDto>>($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
+                ev.IsRegistered = regs?.Any(r => r.UserId == loginModel.Username) ?? false;
+            }
+            events = eventList;
+        }
+        catch
+        {
+            events = new List<EventDto>();
+        }
+        StateHasChanged();
+    }
+
+    async Task Register(Guid eventId)
+    {
+        var resp = await Http.PostAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations", null);
+        if (resp.IsSuccessStatusCode)
+        {
+            await LoadEvents();
+        }
+    }
+
+    async Task Unregister(Guid eventId)
+    {
+        var resp = await Http.DeleteAsync($"{ApiBaseUrl}/api/event/{eventId}/registrations");
+        if (resp.IsSuccessStatusCode)
+        {
+            await LoadEvents();
+        }
+    }
+
+    class LoginResult
+    {
+        public string token { get; set; } = "";
+        public DateTime expiration { get; set; }
+    }
+    class RegistrationDto
+    {
+        public string UserId { get; set; } = "";
+    }
+}
