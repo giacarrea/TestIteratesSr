@@ -1,6 +1,8 @@
 # Projects descriptions 
 
-EventManagerApi:  A .NET 8 Web API for managing events and registrations, featuring JWT authentication and role-based authorization.
+EventBlazorApp: Blazor app consuming EventManagerApi.
+EventManagerApi: Web API for managing events and registrations, featuring JWT authentication and role-based authorization.
+EventManagerApi.Tests: Test project for EventManagerApi
 
 ## Setup Instructions
 
@@ -38,12 +40,12 @@ EventManagerApi:  A .NET 8 Web API for managing events and registrations, featur
 
 ## Improvements Given More Time
 
+- Add server route to get every registrations for a given user.
+
 - Replace in-memory cache with a distributed cache (e.g., Redis) for multi-instance deployments.
 
 - Expand test coverage, especially for edge cases and authorization scenarios.
 
 - Improve error responses and validation feedback for clients.
-
-- Associate events with their creators for finer-grained permissions.
 
 - Splitting EventManagerApi as to have a microservice dedicated to registrations with a messaging bus.
