@@ -7,6 +7,7 @@
 
 @inject HttpClient Http
 @inject AuthSessionService AuthSession
+@inject IJSRuntime JS
 
 <h3>Event Registration</h3>
 
@@ -56,6 +57,11 @@ else
     }
     else
     {
+        if (AuthSession.IsAdmin)
+        {
+            <button class="btn btn-primary mb-3" @onclick="ShowCreateEventModal">Create Event</button>
+        }
+
         <ul class="list-group">
             @foreach (var ev in events)
             {
@@ -63,18 +69,76 @@ else
                     <span>
                         <b>@ev.Title</b> - @ev.Date.ToShortDateString() <span>Remaining seats: @ev.RegistrationList.Registrations.Count / @ev.Capacity </span>
                     </span>
-                    @if (ev.IsRegistered)
+
+                    @if(ev.Status != 2)
                     {
-                        <button class="btn btn-danger btn-sm" @onclick="() => Unregister(ev.Id)">Unregister</button>
+                        @if (ev.IsRegistered)
+                        {
+                            <button class="btn btn-danger btn-sm" @onclick="() => Unregister(ev.Id)">Unregister</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-success btn-sm" @onclick="() => Register(ev.Id)">Register</button>
+                        }
                     }
-                    else
+
+                    @if (AuthSession.IsAdmin)
                     {
-                        <button class="btn btn-success btn-sm" @onclick="() => Register(ev.Id)">Register</button>
+                        <button class="btn btn-secondary btn-sm me-2" @onclick="() => ShowEditEventModal(ev)">Edit</button>
+                        <button class="btn btn-warning btn-sm" @onclick="() => DeleteEvent(ev.Id)">Delete</button>
                     }
                 </li>
             }
         </ul>
     }
+}
+
+@* Modal for Create/Edit Event *@
+@if (showEventModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@((editingEvent?.Id == Guid.Empty) ? "Create Event" : "Edit Event")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseEventModal"></button>
+                </div>
+                <EditForm Model="editingEvent" OnValidSubmit="SaveEventAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label>Title</label>
+                            <InputText class="form-control" @bind-Value="editingEvent.Title" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Description</label>
+                            <InputText class="form-control" @bind-Value="editingEvent.Description" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Date</label>
+                            <InputDate class="form-control" @bind-Value="editingEvent.Date" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Location</label>
+                            <InputText class="form-control" @bind-Value="editingEvent.Location" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Category</label>
+                            <InputText class="form-control" @bind-Value="editingEvent.Category" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Capacity</label>
+                            <InputNumber class="form-control" @bind-Value="editingEvent.Capacity" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseEventModal">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
@@ -89,6 +153,9 @@ else
 
     private bool _loaded = false;
     private string? _error = null;
+
+    bool showEventModal = false;
+    EventDto? editingEvent;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -220,6 +287,120 @@ else
         catch (Exception ex)
         {
             _error = $"An error occurred during unregistration: {ex.Message}";
+        }
+    }
+
+    async Task DeleteEvent(Guid eventId)
+    {
+        var confirm = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this event?");
+        if (!confirm)
+            return;
+
+        try
+        {
+            var resp = await Http.DeleteAsync($"{ApiBaseUrl}/api/event/{eventId}");
+            if (resp.IsSuccessStatusCode)
+            {
+                await LoadEvents();
+            }
+            else
+            {
+                var errorMessage = await resp.Content.ReadAsStringAsync();
+                _error = $"Failed to delete event: {errorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"An error occurred while deleting the event: {ex.Message}";
+        }
+    }
+
+
+    void ShowCreateEventModal()
+    {
+        editingEvent = new EventDto
+            {
+                Id = Guid.Empty,
+                Title = "",
+                Description = "",
+                Date = DateTime.Today,
+                Location = "",
+                Category = "",
+                Capacity = 1,
+                Status = 1,
+                RegistrationList = new RegistrationList { Registrations = new() }
+            };
+        showEventModal = true;
+    }
+
+    void ShowEditEventModal(EventDto ev)
+    {
+        // Clone to avoid editing the list directly before save
+        editingEvent = new EventDto
+            {
+                IdRef = ev.IdRef,
+                Id = ev.Id,
+                Title = ev.Title,
+                Description = ev.Description,
+                Date = ev.Date,
+                Location = ev.Location,
+                Category = ev.Category,
+                Capacity = ev.Capacity,
+                Status = ev.Status,
+                RegistrationList = ev.RegistrationList
+            };
+        showEventModal = true;
+    }
+
+    void CloseEventModal()
+    {
+        showEventModal = false;
+        editingEvent = null;
+    }
+
+    async Task SaveEventAsync()
+    {
+        if (editingEvent == null)
+            return;
+
+        var serializedJson = JsonSerializer.Serialize(editingEvent);
+
+        //Super messy, but whatever...
+        //foreach (var reg in editingEvent.RegistrationList.Registrations)
+        //    reg.Event = new() { Ref=reg.IdRef };        
+
+        try
+        {
+            if (editingEvent.Id == Guid.Empty)
+            {   
+                editingEvent.Id = Guid.NewGuid();
+
+                // Create
+                var resp = await Http.PostAsJsonAsync($"{ApiBaseUrl}/api/event", editingEvent);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var errorMessage = await resp.Content.ReadAsStringAsync();
+                    _error = $"Failed to create event: {errorMessage}";
+                    return;
+                }
+            }
+            else
+            {
+                // Edit
+                var resp = await Http.PutAsJsonAsync($"{ApiBaseUrl}/api/event/{editingEvent.Id}", editingEvent);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var errorMessage = await resp.Content.ReadAsStringAsync();
+                    _error = $"Failed to update event: {errorMessage}";
+                    return;
+                }
+            }
+            showEventModal = false;
+            await LoadEvents();
+        }
+        catch (Exception ex)
+        {
+            _error = $"An error occurred while saving the event: {ex.Message}";
         }
     }
 }

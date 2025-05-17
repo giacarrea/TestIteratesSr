@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using EventBlazorApp.Misc;
+using System.Text.Json.Serialization;
 
 namespace EventBlazorApp.Models
 {
@@ -40,8 +41,19 @@ namespace EventBlazorApp.Models
         [JsonPropertyName("status")]
         public int Status { get; set; }
 
-        [JsonPropertyName("registrations")]
+        //[JsonPropertyName("registrations")]
+        //public RegistrationList RegistrationList { get; set; } = new();
+
+        [JsonIgnore]
         public RegistrationList RegistrationList { get; set; } = new();
+
+        [JsonPropertyName("registrations")]
+        [JsonConverter(typeof(RegistrationsFlexibleConverter))]
+        public List<RegistrationDto> Registrations
+        {
+            get => RegistrationList?.Registrations ?? new();
+            set => RegistrationList = new RegistrationList { Registrations = value ?? new() };
+        }
 
         // Not from API, used for UI logic
         [JsonIgnore]
@@ -71,6 +83,24 @@ namespace EventBlazorApp.Models
         [JsonPropertyName("event")]
         public EventRefDto? Event { get; set; }
 
+        //[JsonPropertyName("event")]
+        //[JsonConverter(typeof(IgnoreAnythingConverter))]
+        //public EventRefDto? Event { get; set; }
+
+        //[JsonPropertyName("event")]
+        //public string? Event { get; set; }
+
+
+        //[JsonIgnore]
+        //public EventRefDto? Event { get; set; }
+
+        //[JsonPropertyName("event")]
+        //public string EventString
+        //{
+        //    get => "string"; // or set to null/empty if you want
+        //    set { /* ignore on set */ }
+        //}
+
         [JsonPropertyName("userId")]
         public string UserId { get; set; } = "";
 
@@ -83,4 +113,6 @@ namespace EventBlazorApp.Models
         [JsonPropertyName("$ref")]
         public string Ref { get; set; } = "";
     }
+
+    public enum EventStatus { Draft, Published, Canceled } //TODO utiliser çà plutôt que int
 }
