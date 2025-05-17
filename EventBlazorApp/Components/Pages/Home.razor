@@ -43,6 +43,11 @@ else if (!AuthSession.IsAuthenticated)
 else
 {
     <h4>Welcome, @AuthSession.Username!</h4>
+    @if (AuthSession.IsAdmin)
+    {
+        <p style="color: #00ff00; font-weight: bold;">[Admin privilege granted]</p>
+    }
+
     <button class="btn btn-secondary mb-2" @onclick="Logout">Logout</button>
     <h4>Events</h4>
     @if (events == null)
@@ -110,9 +115,12 @@ else
         var response = await Http.PostAsJsonAsync($"{ApiBaseUrl}/api/auth/login", loginModel);
         if (response.IsSuccessStatusCode)
         {
+            var rawContent = await response.Content.ReadAsStringAsync();
+
             var result = await response.Content.ReadFromJsonAsync<LoginResult>();
-            AuthSession.JwtToken = result?.token;
+            AuthSession.JwtToken = result?.Token;
             AuthSession.Username = loginModel.Username;
+            AuthSession.IsAdmin = result?.RoleList.Roles.Contains("Admin") ?? false;
             await AuthSession.SaveAsync();
             Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthSession.JwtToken);
             await LoadEvents();
@@ -125,8 +133,7 @@ else
 
     async Task Logout()
     {
-        AuthSession.JwtToken = null;
-        AuthSession.Username = null;
+        AuthSession.Clear();
         await AuthSession.ClearAsync();
         Http.DefaultRequestHeaders.Authorization = null;
         events = null;
@@ -154,9 +161,7 @@ else
 
             // For demo: Assume API returns all events, and you need to check registration status per event            
             foreach (var ev in eventList ?? Enumerable.Empty<EventDto>())
-            {
-                //var regs = await Http.GetFromJsonAsync<List<RegistrationDto>>($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
-
+            {                
                 var rawRegResponse = await Http.GetAsync($"{ApiBaseUrl}/api/event/{ev.Id}/registrations");
                 var rawRegContent = await rawRegResponse.Content.ReadAsStringAsync();
                 var regListDto = JsonSerializer.Deserialize<RegistrationList>(rawRegContent);
@@ -216,15 +221,5 @@ else
         {
             _error = $"An error occurred during unregistration: {ex.Message}";
         }
-    }
-
-    class LoginResult
-    {
-        public string token { get; set; } = "";
-        public DateTime expiration { get; set; }
-    }
-    class RegistrationDto
-    {
-        public string UserId { get; set; } = "";
     }
 }

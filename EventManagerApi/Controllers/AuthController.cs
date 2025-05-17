@@ -49,7 +49,8 @@ namespace EventManagerApi.Controllers
                 return Ok(new
                 {
                     token = new JwtSecurityTokenHandler().WriteToken(token),
-                    expiration = token.ValidTo
+                    expiration = token.ValidTo,
+                    roleList = roles
                 });
             }
             return Unauthorized();
