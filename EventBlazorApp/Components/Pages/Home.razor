@@ -13,6 +13,11 @@
 
 @if (!string.IsNullOrEmpty(_error))
 {
+    if (AuthSession.IsAuthenticated)
+    {
+        <button class="btn btn-secondary mb-2" @onclick="Logout">Logout</button>
+    }
+
     <div class="alert alert-danger">
         <strong>Error:</strong> @(_error)
     </div>
